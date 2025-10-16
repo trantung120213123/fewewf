@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Python Sandbox + Deepseek Chat AI</title>
+
+<!-- CodeMirror CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/theme/monokai.min.css">
+
+<!-- Skulpt JS -->
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+
+<!-- CodeMirror JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.14/mode/python/python.min.js"></script>
+
+<style>
+body { font-family: monospace; background: #272822; color: #f8f8f2; margin: 0; display: flex; height: 100vh; }
+#editor-container { flex: 2; display: flex; flex-direction: column; padding: 10px; }
+#chat-container { flex: 1; display: flex; flex-direction: column; border-left: 2px solid #555; padding: 10px; }
+#editor { height: 50%; border: 1px solid #555; }
+#console { flex: 1; background: #1e1e1e; border: 1px solid #555; overflow-y: auto; padding: 10px; margin-top: 10px; }
+#chat-messages { flex: 1; overflow-y: auto; background: #1e1e1e; padding: 10px; margin-bottom: 10px; }
+#chat-input { display: flex; }
+#chat-input input { flex: 1; padding: 5px; font-size: 14px; }
+#chat-input button { padding: 5px 10px; margin-left: 5px; }
+.chat-user { color: #50fa7b; font-weight: bold; }
+.chat-ai { color: #ff79c6; }
+.CodeMirror { height: 100%; }
+</style>
+</head>
+<body>
+
+<div id="editor-container">
+  <h3>Python Editor</h3>
+  <textarea id="code">import math\n\ndef my_function():\n    print("Hello world!")\nmy_function()</textarea>
+  <button onclick="runCode()">Run</button>
+  <div id="console"></div>
+</div>
+
+<div id="chat-container">
+  <h3>AI Chat</h3>
+  <div id="chat-messages"></div>
+  <div id="chat-input">
+    <input type="text" id="chat-text" placeholder="Hỏi AI về code..."/>
+    <button onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+<script>
+// CodeMirror
+var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+    mode: "python",
+    theme: "monokai",
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    matchBrackets: true,
+    autofocus: true
+});
+
+// Python console
+const consoleEl = document.getElementById("console");
+function outf(text){ consoleEl.innerHTML += text + "<br>"; consoleEl.scrollTop = consoleEl.scrollHeight; }
+function errf(text){ consoleEl.innerHTML += '<span style="color:red">'+text+'</span><br>'; consoleEl.scrollTop = consoleEl.scrollHeight; }
+async function builtin_input(prompt_text){ return prompt(prompt_text || ""); }
+
+function runCode(){
+    consoleEl.innerHTML = "";
+    Sk.configure({output: outf, input: builtin_input, read:function(x){if(Sk.builtinFiles===undefined||Sk.builtinFiles["files"][x]===undefined) throw "File not found: "+x; return Sk.builtinFiles["files"][x];}});
+    Sk.misceval.asyncToPromise(()=>Sk.importMainWithBody("<stdin>", false, editor.getValue(), true)).catch(errf);
+}
+
+// Chat Deepseek
+const chatMessages = document.getElementById("chat-messages");
+async function sendChat(){
+    const userMsg = document.getElementById("chat-text").value;
+    if(!userMsg) return;
+    appendChat("user", userMsg);
+    document.getElementById("chat-text").value = "";
+
+    const codeContent = editor.getValue();
+    const response = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({message: userMsg, code: codeContent})
+    });
+    const data = await response.json();
+    appendChat("ai", data.reply);
+    if(data.updatedCode) editor.setValue(data.updatedCode);
+}
+
+function appendChat(sender, text){
+    const div = document.createElement("div");
+    div.className = sender==="user"?"chat-user":"chat-ai";
+    div.innerHTML = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+</script>
+
+</body>
+</html>
