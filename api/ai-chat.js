@@ -3,7 +3,7 @@ import OpenAI from "openai";
 // Deepseek dùng OpenAI SDK nhưng baseURL khác
 const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
-  apiKey: process.env.DEEPSEEK_API_KEY,
+  apiKey:"sk-8d1760f646e44e198e5e4a3815bb426a",
 });
 
 export default async function handler(req, res) {
